@@ -1,0 +1,291 @@
+
+body{
+    color: white;
+    background-color: black;
+}
+
+*{
+    margin: 0;
+    padding: 0;
+    font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+}
+
+:root{
+    --transgrey: rgba(128, 128, 128, 0.292);
+    --pcbg: rgb(21, 21, 21);
+    --graytext: rgb(177, 177, 177);
+}
+
+.plist{
+    display: flex;
+    gap: 5px;
+    padding: 5px;
+}
+
+.plist .left{
+    box-sizing: border-box;
+    width: 25vw;
+    min-width: 250px;
+    flex-shrink: 0;
+    padding: 10px;
+    min-height: 100vh;
+    border-radius: 5px;
+    background-color: var(--pcbg);
+}
+
+.plist .right{
+    flex: 1;
+    min-height: 100vh;
+    min-width: 0;
+    padding: 10px 25px;
+    border-radius: 5px;
+    background-color: var(--pcbg);
+    overflow: hidden;
+}
+
+.nav{
+    width: 100%;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 10px 20px;
+    min-height: 55px;
+    box-sizing: border-box;
+}
+
+.nav .logo{
+    height: 27px;
+    padding: 3px;
+    cursor: pointer;
+    flex-shrink: 0;
+}
+
+.nav .center{
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    gap: 15px;
+    flex: 1;
+    max-width: 50%;
+}
+.nav .center span{
+    box-sizing: border-box;
+    transition: border 0.5s linear 0s;
+}
+
+.nav .center span:first-child{
+    background-color: var(--transgrey);
+    height: 40px;
+    width: 40px;
+    border-radius: 50%;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    flex-shrink: 0;
+}
+.nav .center span:nth-child(2){
+    background-color: var(--transgrey);
+    display: flex;
+    gap: 15px;
+    align-items: center;
+    padding: 10px 20px;
+    border-radius: 25px;
+    border: 2px solid transparent;
+}
+
+.nav .center input{
+    border: none;
+    outline: none;
+    background: transparent;
+    width: min(260px, 25vw);
+    color: var(--graytext);
+    flex: 1;
+    min-width: 150px;
+}
+.nav .center input::placeholder{
+    color: rgb(196, 196, 196);
+}
+
+.nav .center span:focus-within{
+    border-color: white;
+}
+
+.nav .center span img{
+    height: 16px;
+    
+}
+
+.nav .center span{
+    cursor: pointer;
+}
+
+
+.nav .right img{
+    height: 10px;
+}
+.nav .right img:first-child{
+    height: 13px;
+}
+
+.nav .right{
+    display: flex;
+    align-items: center;
+    gap: 15px;
+    color: rgb(186, 186, 186);
+    flex-shrink: 0;
+}
+
+.nav .right .install{
+    font-size: 14px;
+    white-space: nowrap;
+}
+
+.nav .right .account{
+    background-color: #1db954;
+    width: 28px;
+    height: 28px;
+    border-radius: 50%;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    font-weight: bold;
+    color: black;
+}
+
+.nav .right span{
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    gap: 5px;
+}
+
+.plist .right .sec span{
+    padding: 6px 10px;
+    margin-right: 6px;
+    font-size: 12px;
+    border-radius: 15px;
+    background-color: rgba(128, 128, 128, 0.473);
+
+}
+
+.plist .right .plist-cont{
+    margin: 25px 0px;
+}
+.plist .right .plist-cont .title{
+    display: flex;
+    justify-content: space-between;
+}
+.plist .right .plist-cont .title a{
+    color:var(--graytext);
+    font-size: 12px;
+    font-weight:600;
+    position: relative;
+    right: 25px;
+}
+
+
+.plist-cont .plistcard {
+    position: relative;
+    flex-shrink: 0;
+    height: 185px;
+    width: 145px;
+    border-radius: 5px;
+    margin: 7px 0px;
+    padding: 8px;
+    box-sizing: border-box;
+    overflow: hidden;
+    text-overflow:unset;
+    background-color: transparent;
+    cursor: pointer;
+}
+.plist-cont .plistcard:hover{
+    background-color: var(--transgrey);
+    
+}
+
+/* .plist-cont .plistcard img:hover{
+    scale: 1.2;
+} */
+.plist-cont .plistcards{
+    display: flex;
+    gap: 15px;
+    overflow-x: auto;
+    overflow-y: hidden;
+    padding: 10px 0;
+}
+
+/* Custom scrollbar for webkit browsers */
+.plist-cont .plistcards::-webkit-scrollbar {
+    display: none;
+}
+
+.plist-cont .plistcards::-webkit-scrollbar-track {
+    background: transparent;
+    border-radius: 4px;
+}
+
+.plist-cont .plistcards::-webkit-scrollbar-thumb {
+    background: #555;
+    border-radius: 4px;
+}
+
+.plist-cont .plistcards::-webkit-scrollbar-thumb:hover {
+    background: #777;
+}
+
+
+.plist-cont .plistcard img{
+    width: 100%;
+    max-height: 135px;
+    border-radius: 5px;
+
+}
+
+.plist-cont .plistcard p{
+    margin: 5px 0px;
+    font-size: 12px;
+    color: var(--graytext);
+    font-weight: 500;
+    display: -webkit-box;
+    -webkit-line-clamp: 2;
+    line-clamp: 2;
+    -webkit-box-orient: vertical;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    line-height: 1.4;
+}
+
+.plist-cont .plistcard .play-btn{
+    position: absolute;
+    bottom: 50px;
+    right: 15px;
+    width: 40px;
+    height: 40px;
+    border-radius: 50%;
+    background-color: #1db954;
+    border: none;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    opacity: 0;
+    transform: translateY(10px);
+    transition: all 0.3s ease;
+    cursor: pointer;
+    box-shadow: 0 4px 8px rgba(0, 0, 0, 0.3);
+}
+
+.plist-cont .plistcard .play-btn img{
+    width: 20px;
+    height: 20px;
+    filter: none;
+}
+
+.plist-cont .plistcard:hover .play-btn{
+    opacity: 1;
+    transform: translateY(0);
+}
+
+.plist-cont .plistcard .play-btn:hover{
+    background-color: #1ed760;
+    transform: scale(1.05);
+}
