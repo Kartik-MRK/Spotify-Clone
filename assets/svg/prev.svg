@@ -1,0 +1,6 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="36" height="36" viewBox="0 0 24 24" aria-hidden="true" role="img">
+  <!-- vertical bar on left -->
+  <rect x="6" y="6" width="2" height="12" rx="0.5" fill="currentColor"/>
+  <!-- left-pointing triangle -->
+  <path d="M18 6 L10 12 L18 18 Z" fill="currentColor"/>
+</svg>
