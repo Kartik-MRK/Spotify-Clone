@@ -25,9 +25,10 @@ body{
 .plist .left{
     box-sizing: border-box;
     width: 25vw;
-    width: 290px;
+    width: min(290px,30vw);
+    min-width: 240px;
     padding: 10px;
-    height: calc(100vh - 92px);
+    height: calc(100vh - 139px);
     border-radius: 5px;
     background-color: var(--pcbg);
     display: flex;
@@ -37,7 +38,7 @@ body{
 .plist .right{
     position: relative;
     flex: 1;
-    height: calc(100vh - 92px);
+    height: calc(100vh - 139px);
     min-width: 0;
     padding: 10px 25px;
     border-radius: 5px;
@@ -145,17 +146,30 @@ body{
     font-size: 14px;
     white-space: nowrap;
 }
-
-.nav .right .account{
-    background-color: #1db954;
-    width: 28px;
-    height: 28px;
+.nav .right .account {
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    background-color: rgba(165, 165, 165, 0.276);
+    width: 37px;
+    height: 37px;
+    border-radius: 50%;
+}
+.nav .right .account span{
+    background-color: #19e460;
+    width: 25px;
+    font-size: 13px;
+    height: 25px;
     border-radius: 50%;
     display: flex;
     justify-content: center;
     align-items: center;
     font-weight: bold;
     color: black;
+    transition: all 0.5s ease;
+}
+.nav .right .account:hover{
+    transform: scale(1.05);
 }
 
 .nav .right span{
@@ -164,18 +178,86 @@ body{
     align-items: center;
     gap: 5px;
 }
+.plist .right .sec{
+    display: flex;
+}
 
 .plist .right .sec span{
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
     padding: 6px 10px;
     margin-right: 6px;
     font-size: 12px;
     border-radius: 15px;
     background-color: rgba(128, 128, 128, 0.473);
+    cursor: pointer;
+    transition: all 0.3s ease;
+}
 
+.plist .right .sec span:hover{
+    background-color: rgba(128, 128, 128, 0.6);
 }
 
 .plist .right .plist-cont{
     margin: 25px 0px;
+}
+
+.plist .right .plist-cont .cards-container{
+    position: relative;
+    display: flex;
+    align-items: center;
+}
+
+.plist .right .plist-cont .scroll-indicator{
+    position: absolute;
+    width: 30px;
+    height: 30px;
+    background-color: rgba(0, 0, 0, 0.7);
+    border-radius: 50%;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    cursor: pointer;
+    z-index: 2;
+    opacity: 0;
+    transition: all 0.3s ease;
+    -webkit-backdrop-filter: blur(10px);
+    backdrop-filter: blur(10px);
+    border: 1px solid rgba(255, 255, 255, 0.1);
+}
+
+.plist .right .plist-cont .cards-container:hover .scroll-indicator{
+    opacity: 1;
+}
+
+.plist .right .plist-cont .scroll-indicator:hover{
+    background-color: rgba(255, 255, 255, 0.1);
+    transform: scale(1.1);
+}
+
+.plist .right .plist-cont .left-indicator{
+    left: 10px;
+}
+
+.plist .right .plist-cont .right-indicator{
+    right: 10px;
+}
+
+.plist .right .plist-cont .scroll-indicator img{
+    width: 14px;
+    height: 14px;
+    filter: invert(0.2);
+    transition: all 0.3s ease;
+}
+
+.plist .right .plist-cont .scroll-indicator:hover img{
+    filter: invert(0.8);
+}
+
+.plist .right .plist-cont .scroll-indicator.hidden{
+    opacity: 0 !important;
+    pointer-events: none;
 }
 .plist .right .plist-cont .title{
     display: flex;
@@ -372,8 +454,8 @@ body{
 }
 
 .controls .right-controls{
-    padding:0px 45px;
-    padding-left: 65px;
+    padding:0px 5vw;
+    padding-left: 5vw;
     display: flex;
     align-items: center;
     gap: 15px;
@@ -440,14 +522,21 @@ body{
 .controls .right-controls img{
     height: 18px;
     filter: invert(.7);
+    cursor: pointer;
 }
 
 .plist .left h4{
+    display: flex;
+    justify-content: space-between;
     margin-bottom: 10px;
     color: var(--graytext);
-    font-size: 14px;
+    font-size: 16px;
     font-weight: 600;
     flex-shrink: 0;
+}
+.plist .left h4 img{
+    height: 26px;
+    cursor: pointer;
 }
 
 .plist .left .playlist{
@@ -503,6 +592,20 @@ body{
     border-color: rgba(255, 255, 255, 0.2);
 }
 
+.plist .left .playlist ul li.playing{
+    background-color: rgba(29, 185, 84, 0.2);
+    border-color: rgba(29, 185, 84, 0.6);
+}
+
+.plist .left .playlist ul li.playing span{
+    color: #1db954;
+    font-weight: 600;
+}
+
+.plist .left .playlist ul li.playing:hover{
+    background-color: rgba(29, 185, 84, 0.3);
+}
+
 .plist .left .playlist ul li span{
     display: inline-block;
     width: 100%;
@@ -513,4 +616,112 @@ body{
     height: 30px;
     filter: invert(.8);
     flex-shrink: 0;
+}
+.plist .right .sec span:first-child{
+    transform: translateX(-25%);
+    padding: 6px;
+    margin-right: 25px;
+    border-radius: 50%;
+    background: linear-gradient(135deg, #1ed760 0%, #1db954 50%, #1aa34a 100%);
+    transition: all .5s ease;
+    display: none;
+}
+.plist .right .sec span:first-child:hover{
+    transform: scale(1.05),translateX(-25%);
+    background: linear-gradient(135deg, #2E3192 0%, #1BFFFF 100%);
+}
+.plist .right .sec span:first-child img{
+    height: 23px;
+    filter: invert(.9);
+}
+
+
+.plist .left h4 img{
+    visibility: hidden;
+}
+@media (max-width:750px) {
+    .plist .left h4 img{
+    visibility: visible;
+}
+    .plist .left{
+        position: absolute;
+        top: 5px;
+        z-index: 2;
+        transition: all .5s ease;
+        transform: translatex(-120%);
+        height: calc(100vh - 15px);
+        width: 50vw;
+    }
+    
+    .plist .left.show{
+        transform: translatex(0%);
+    }
+    
+    .plist .right .sec span:first-child{
+        display: flex;
+    }
+    
+    /* Add overlay when library is open */
+    .plist::before {
+        content: '';
+        position: fixed;
+        top: 0;
+        left: 0;
+        width: 100%;
+        height: 100%;
+        background-color: rgba(0, 0, 0, 0.5);
+        z-index: 1;
+        opacity: 0;
+        visibility: hidden;
+        transition: all 0.3s ease;
+    }
+    
+    .plist.library-open::before {
+        opacity: 1;
+        visibility: visible;
+    }
+
+    .nav .right .account{
+        display: none;
+    }
+    .nav .right .install{
+        display: none;
+    }
+    .nav .right .bell{
+        visibility: hidden;
+    }
+    .nav .center input{
+        font-size: 12px;
+    }
+}
+@media (max-width:590px){
+    .controls{
+        display: grid;
+        grid-template-columns: 1fr 3fr;
+    }
+    .controls .right-controls{
+        display: none;
+    }
+
+}
+
+@media (max-width:420px){
+    .nav .center input{
+        font-size: 9px;
+        min-width: 30vw;
+    }
+    .nav .center span img{
+        height: 13px;
+        gap: 7px;
+    }
+    .nav .center span:nth-child(2){
+        display: flex;
+        gap: 8px;
+    }
+    .nav .center{
+        gap: 8px;
+    }
+    .plist .left{
+        width: 80vw;
+    }
 }
