@@ -1,5 +1,6 @@
 var currentTrack=new Audio()
 var currentPlayingElement = null; // Track which playlist item is currently playing
+var songs
 
 function resetAllPlaylistIcons() {
     // Reset all playlist items to show play icon and remove highlighting
@@ -27,19 +28,24 @@ function updatePlaylistIcon(element, isPlaying) {
     }
 }
 
-async function getsongs(){
-    let a=await fetch('http://127.0.0.1:3000/Spotify%20Clone/assets/songs')
+async function getsongs(folder){
+    console.log("Fetching songs from folder:", folder);
+    let a=await fetch(`http://127.0.0.1:3000/Spotify%20Clone/assets/songs/${folder}`)
     let response=await a.text()
+    console.log("Raw response:", response);
     let div=document.createElement("div")
     div.innerHTML=response
     let as=div.getElementsByTagName('a')
     let songs=[]
     for (const a of as) {
+        console.log("Found link:", a.href);
         if(a.href.endsWith('.mp3'))
         {
             songs.push(a.href)
+            console.log("Added song:", a.href);
         }
     }
+    console.log("Final songs array:", songs);
     return songs
         
 }
@@ -62,6 +68,8 @@ function addtime(currentTrack) {
 }
 
 function playMusic(track,playlistElement){
+    console.log("playMusic called with track:", track);
+    
     // Reset all playlist icons first
     resetAllPlaylistIcons();
     
@@ -73,28 +81,277 @@ function playMusic(track,playlistElement){
         updatePlaylistIcon(currentPlayingElement, true);
     }
 
+    // console.log("Setting currentTrack.src to:", track);
     currentTrack.src=track
-    currentTrack.play()    
+    
+    // Add error handling
+    currentTrack.addEventListener('error', (e) => {
+        console.error("Audio error:", e);
+        console.error("Failed to load:", track);
+    });
+    
+    currentTrack.addEventListener('loadstart', () => {
+        console.log("Started loading:", track);
+    });
+    
+    currentTrack.addEventListener('canplay', () => {
+        console.log("Can play:", track);
+    });
+    
+    console.log("Attempting to play...");
+    currentTrack.play().then(() => {
+        console.log("Play successful");
+    }).catch((error) => {
+        console.error("Play failed:", error);
+    });
+    
     // Add event listener to update time continuously
     currentTrack.addEventListener('timeupdate', () => {
         addtime(currentTrack);
-        document.querySelector(".progress-bar").style.width=`${(currentTrack.currentTime/currentTrack.duration)*100}%`
+        // Update progress bar during playback (avoid conflict with seeking)
+        if (!isNaN(currentTrack.duration) && isFinite(currentTrack.duration)) {
+            const pct = (currentTrack.currentTime / currentTrack.duration) * 100;
+            const progressBar = document.querySelector(".progress-bar");
+            const progressContainer = document.querySelector(".progress-container");
+            
+            // Only update if not actively dragging/seeking
+            if (progressBar && (!progressContainer || !progressContainer.classList.contains("dragging"))) {
+                progressBar.style.width = `${pct}%`;
+            }
+        }
     });
-    let songname=document.querySelector(".controls>.left-info")
-        songname.innerHTML=`${track.split("/songs/")[1].replaceAll("%20"," ").replaceAll(".mp3","")}`
-    
+    // Update Now Playing UI (cover, title, artist)
+    const leftInfo = document.querySelector(".controls .left-info");
+    const coverImg = leftInfo.querySelector(".sng-img");
+    const titleEl = leftInfo.querySelector(".song-info .song-name");
+    const artistEl = leftInfo.querySelector(".song-info .artist-name");
+
+    // Derive album folder and cover path
+    let songPath = track.split("/songs/")[1];
+    let decodedSongPath = decodeURIComponent(songPath);
+    let pathParts = decodedSongPath.split("/");
+    let fileName = pathParts.pop();
+    let albumFolder = pathParts.join("/");
+    let displayName = fileName.replace(/\.mp3$/i, "");
+
+    // Set cover image from album folder cover.jpeg if available
+    if (albumFolder) {
+        // Use same base origin as track
+        try {
+            const trackUrl = new URL(track);
+            const base = `${trackUrl.origin}${trackUrl.pathname.split("/assets/")[0]}`; // typically ""
+            // Build cover URL directly relative to known structure
+            const coverUrl = `${trackUrl.origin}/Spotify%20Clone/assets/songs/${encodeURI(albumFolder)}/cover.jpeg`;
+            // Fallback to default if not found
+            coverImg.onerror = function(){
+                coverImg.onerror = null;
+                coverImg.src = "assets/img/cover.jpeg";
+            };
+            coverImg.src = coverUrl;
+        } catch (e) {
+            console.warn("Failed to compute cover URL, keeping default", e);
+        }
+    }
+
+    // Default UI updates
+    titleEl.textContent = displayName;
+    artistEl.textContent = "Unknown Artist";
+
+    // Try to read ID3 tags (artist, title) from the remote file
+    if (window.jsmediatags) {
+        try {
+            new window.jsmediatags.Reader(track)
+                .setTagsToRead(["artist", "title"]) // minimal
+                .read({
+                    onSuccess: function(result){
+                        const tags = result.tags || {};
+                        if (tags.title && typeof tags.title === "string") {
+                            titleEl.textContent = tags.title;
+                        }
+                        if (tags.artist && typeof tags.artist === "string") {
+                            artistEl.textContent = tags.artist;
+                        }
+                    },
+                    onError: function(error){
+                        console.warn("jsmediatags error:", error);
+                    }
+                });
+        } catch(err) {
+            console.warn("Failed to invoke jsmediatags:", err);
+        }
+    }
+
     // Add event listener for when metadata loads (to get duration)
     currentTrack.addEventListener('loadedmetadata', () => {
         addtime(currentTrack);
     });
+
+    // Remove any existing 'ended' event listeners to prevent multiple triggers
+    currentTrack.removeEventListener('ended', handleSongEnd);
+    
+    // Auto-play next song when current song ends
+    currentTrack.addEventListener('ended', handleSongEnd);
+}
+
+// Define the song end handler function outside to avoid multiple listeners
+function handleSongEnd() {
+    console.log("Song ended, playing next...");
+    if (songs && songs.length > 0) {
+        let currentIndex = songs.indexOf(currentTrack.src);
+        let nextIndex = (currentIndex + 1) % songs.length; // Loop to beginning if at end
+        
+        // Find the corresponding playlist element
+        let playlistElements = document.querySelectorAll(".playlist ul li");
+        let targetElement = null;
+        
+        // Extract the song name from the URL for comparison
+        let songPath = songs[nextIndex].split("/songs/")[1];
+        let targetSongName;
+        if (songPath.includes("/")) {
+            targetSongName = songPath.split("/").pop().replaceAll("%20", " ").replaceAll(".mp3", "");
+        } else {
+            targetSongName = songPath.replaceAll("%20", " ").replaceAll(".mp3", "");
+        }
+        
+        // Find matching playlist element
+        playlistElements.forEach(el => {
+            let songName = el.querySelector("span").innerHTML;
+            if (songName === targetSongName) {
+                targetElement = el;
+            }
+        });
+        
+        // Play next song
+        playMusic(songs[nextIndex], targetElement);
+        
+        // Update play button to pause state
+        let play = document.getElementById("play");
+        if (play) {
+            play.src = "assets/svg/pause.svg";
+        }
+    }
 }
 
 
 async function main(){
+    //making dynamic albums
+    async function dynamicalbums(){
+        let lang_plist={
+            'mixed':'mixed',
+            'hindi':'hindi-songs',
+            'kannada':'kannada-hits'
+        }
+        let alb=await fetch('http://127.0.0.1:3000/Spotify%20Clone/assets/songs')
+        let response=await alb.text()
+        let div=document.createElement("div")
+        div.innerHTML=response
+        let albums=Array.from(div.getElementsByTagName('a')).slice(1)
+        // console.log(albums);
+        for (const element of albums) {
+            let seperator=element.innerText.lastIndexOf("-")
+            let language=element.innerText.slice(seperator+1).split("/")[0]
+            let list_cont=document.querySelector(`#${lang_plist[language]}`)
+            let name=element.innerText.slice(0,seperator).split("/")[0]
+            let card=document.createElement("div")
+            card.classList.add("plistcard")
+            card.innerHTML=`<img src="assets/songs/${element.innerText}cover.jpeg" alt="">
+                                <p>${name}</p>
+                                <span class="play-btn"><img src="assets/svg/play.svg" alt=""></span>`
+
+            list_cont.appendChild(card)
+            card.addEventListener("click",async ()=>{
+                songs=await getsongs(element.innerText.split("/")[0])
+                library_function()
+                
+            })
+                
+        }
+        //displaying cards
+        
+        // Re-initialize scroll indicators after content is loaded
+        initScrollIndicators();
+    }
+    await dynamicalbums()
+
+    function library_function(){
+        // Clear existing playlist first
+        let songUL = document.querySelector(".playlist").getElementsByTagName("ul")[0];
+        songUL.innerHTML = "";
+        
+        // Add new songs to the playlist
+        for (const song of songs) {
+            // More robust song name extraction
+            let songPath = song.split("/songs/")[1]; // Get everything after /songs/
+            let songName;
+            
+            // Check if the path contains a folder structure (has /)
+            if (songPath.includes("/")) {
+                // Extract just the filename from the nested structure
+                songName = songPath.split("/").pop().replaceAll("%20", " ").replaceAll(".mp3", "");
+            } else {
+                // Direct file in songs folder
+                songName = songPath.replaceAll("%20", " ").replaceAll(".mp3", "");
+            }
+
+            songUL.innerHTML += `<li><img src="assets/svg/music.svg" alt=""><span>${songName}</span><img src="assets/svg/play.svg" alt=""></li>`;
+        }
+        
+        // Remove existing event listeners and add new ones
+        Array.from(document.querySelectorAll(".playlist>ul>li")).forEach(e => {
+            // Clone the element to remove all existing event listeners
+            let newElement = e.cloneNode(true);
+            e.parentNode.replaceChild(newElement, e);
+            
+            // Add click event listener to the new element
+            newElement.addEventListener("click", (event) => {
+                let songName = newElement.querySelector("span").innerHTML;
+                console.log("Clicked song name:", songName);
+                
+                // Debug: Log all songs and their parsed names
+                console.log("All songs in array:");
+                songs.forEach((song, index) => {
+                    let songPath = song.split("/songs/")[1];
+                    let cleanSongName;
+                    
+                    if (songPath.includes("/")) {
+                        cleanSongName = songPath.split("/").pop().replaceAll("%20", " ").replaceAll(".mp3", "");
+                    } else {
+                        cleanSongName = songPath.replaceAll("%20", " ").replaceAll(".mp3", "");
+                    }
+                    
+                    console.log(`${index}: Original: ${song}`);
+                    console.log(`${index}: Parsed: ${cleanSongName}`);
+                    console.log(`${index}: Match: ${cleanSongName === songName}`);
+                });
+                
+                // Construct the correct path
+                let songPath = songs.find(song => {
+                    let songPathPart = song.split("/songs/")[1];
+                    let cleanSongName;
+                    
+                    if (songPathPart.includes("/")) {
+                        cleanSongName = songPathPart.split("/").pop().replaceAll("%20", " ").replaceAll(".mp3", "");
+                    } else {
+                        cleanSongName = songPathPart.replaceAll("%20", " ").replaceAll(".mp3", "");
+                    }
+                    
+                    return cleanSongName === songName;
+                });
+                
+                console.log("Found song path:", songPath);
+                
+                if (songPath) {
+                    playMusic(songPath, newElement);
+                    let play = document.getElementById("play");
+                    play.src = "assets/svg/pause.svg";
+                } else {
+                    console.error("Song not found for:", songName);
+                }
+            });
+        });
+    }
     
-    var songs=await getsongs()
-    console.log(songs);
-    var audio=new Audio(songs[0]);
+    // var songs=await getsongs()
     
     // Define UI elements once at the top
     let playbtn = document.getElementById("play-btn");
@@ -104,20 +361,7 @@ async function main(){
     
     // audio.play();
 
-    let songUL=document.querySelector(".playlist").getElementsByTagName("ul")[0]
-    for (const song of songs) {
-        songUL.innerHTML=songUL.innerHTML+`<li><img src="assets/svg/music.svg" alt=""><span>${song.split("/songs/")[1].replaceAll("%20"," ").replaceAll(".mp3","")}</span><img src="assets/svg/play.svg" alt=""></li>`
-    }
-    Array.from(document.querySelectorAll(".playlist>ul>li")).forEach(e=>{
-        console.log(e.querySelector("span").innerHTML);
-        e.addEventListener("click",(cont)=>{
-            playMusic("assets/songs/"+e.querySelector("span").innerHTML+".mp3",e);
-            
-            let play = document.getElementById("play");
-            play.src="assets/svg/pause.svg"
-        })
-        
-    })
+    
     
     
     playbtn.addEventListener("click",(e)=>{
@@ -140,26 +384,82 @@ async function main(){
     })
 
 
-    //adding the seekbar functionality
-    document.querySelector(".progress-container").addEventListener("click", e => {
-        // Get the progress container element to ensure consistent calculations
-        const progressContainer = document.querySelector(".progress-container");
+    // Seekbar: click and drag support (mouse + touch)
+    const progressContainer = document.querySelector(".progress-container");
+    const progressBar = document.querySelector(".progress-bar");
+    let isSeeking = false;
+    let seekPercent = 0;
+    let seekRafPending = false;
+
+    function applySeekVisual() {
+        progressBar.style.width = `${seekPercent * 100}%`;
+        if (!isNaN(currentTrack.duration) && isFinite(currentTrack.duration)) {
+            currentTrack.currentTime = seekPercent * currentTrack.duration;
+        }
+        seekRafPending = false;
+    }
+    function updateSeekFromClientX(clientX) {
         const rect = progressContainer.getBoundingClientRect();
-        
-        // Calculate the percentage clicked relative to the container
-        let percent = (e.clientX - rect.left) / rect.width;
-        percent = Math.min(Math.max(percent, 0), 1); // Ensure percent is between 0 and 1
-        
-        // Update the visual progress bar
-        document.querySelector(".progress-bar").style.width = `${percent * 100}%`;
-        
-        // Update the actual audio playback position
-        currentTrack.currentTime = percent * currentTrack.duration;
-    })
+        let percent = (clientX - rect.left) / rect.width;
+        seekPercent = Math.min(Math.max(percent, 0), 1);
+        if (!seekRafPending) {
+            seekRafPending = true;
+            requestAnimationFrame(applySeekVisual);
+        }
+    }
+
+    // Click to seek
+    progressContainer.addEventListener("click", (e) => {
+        updateSeekFromClientX(e.clientX);
+    });
+
+    // Drag start
+    const onSeekStart = (clientX) => {
+        isSeeking = true;
+        progressContainer.classList.add("dragging");
+        updateSeekFromClientX(clientX);
+    };
+    const onSeekMove = (clientX) => {
+        if (!isSeeking) return;
+        updateSeekFromClientX(clientX);
+    };
+    const onSeekEnd = () => {
+        if (!isSeeking) return;
+        isSeeking = false;
+        progressContainer.classList.remove("dragging");
+    };
+
+    // Mouse events
+    progressContainer.addEventListener("mousedown", (e) => {
+        onSeekStart(e.clientX);
+        window.addEventListener("mousemove", mouseMoveSeek);
+        window.addEventListener("mouseup", mouseUpSeek, { once: true });
+    });
+    function mouseMoveSeek(e){ onSeekMove(e.clientX); }
+    function mouseUpSeek(){
+        window.removeEventListener("mousemove", mouseMoveSeek);
+        onSeekEnd();
+    }
+
+    // Touch events
+    progressContainer.addEventListener("touchstart", (e) => {
+        if (e.touches && e.touches.length) {
+            onSeekStart(e.touches[0].clientX);
+        }
+    }, { passive: true });
+    progressContainer.addEventListener("touchmove", (e) => {
+        if (e.touches && e.touches.length) {
+            onSeekMove(e.touches[0].clientX);
+        }
+    }, { passive: true });
+    progressContainer.addEventListener("touchend", () => {
+        onSeekEnd();
+    });
 
     //adding previous and next button functionality
-
     prev.addEventListener("click", e => {
+        if (!songs || songs.length === 0) return; // Check if songs array exists and has content
+        
         let index = songs.indexOf(currentTrack.src);
         let prevIndex = (index - 1 + songs.length) % songs.length;
         // Find the corresponding playlist element
@@ -167,7 +467,13 @@ async function main(){
         let targetElement = null;
         
         // Extract the song name from the URL for comparison
-        let targetSongName = songs[prevIndex].split("/songs/")[1].replaceAll("%20", " ").replaceAll(".mp3", "");
+        let songPath = songs[prevIndex].split("/songs/")[1];
+        let targetSongName;
+        if (songPath.includes("/")) {
+            targetSongName = songPath.split("/").pop().replaceAll("%20", " ").replaceAll(".mp3", "");
+        } else {
+            targetSongName = songPath.replaceAll("%20", " ").replaceAll(".mp3", "");
+        }
         
         playlistElements.forEach(el => {
             let songName = el.querySelector("span").innerHTML;
@@ -181,6 +487,8 @@ async function main(){
     });
 
     next.addEventListener("click", e => {
+        if (!songs || songs.length === 0) return; // Check if songs array exists and has content
+        
         let index = songs.indexOf(currentTrack.src);
         let nextIndex = (index + 1) % songs.length;
         // Find the corresponding playlist element
@@ -188,7 +496,13 @@ async function main(){
         let targetElement = null;
         
         // Extract the song name from the URL for comparison
-        let targetSongName = songs[nextIndex].split("/songs/")[1].replaceAll("%20", " ").replaceAll(".mp3", "");
+        let songPath = songs[nextIndex].split("/songs/")[1];
+        let targetSongName;
+        if (songPath.includes("/")) {
+            targetSongName = songPath.split("/").pop().replaceAll("%20", " ").replaceAll(".mp3", "");
+        } else {
+            targetSongName = songPath.replaceAll("%20", " ").replaceAll(".mp3", "");
+        }
         
         playlistElements.forEach(el => {
             let songName = el.querySelector("span").innerHTML;
@@ -201,21 +515,79 @@ async function main(){
         play.src="assets/svg/pause.svg";
     });
 
-    //adding volume functionality
-    document.querySelector(".controls>.right-controls>.volume-container>.volume").style.width ="100%"
-    var percent=1
-    document.querySelector(".controls>.right-controls>.volume-container").addEventListener("click",e=>{
-        const volumecontainer = document.querySelector(".controls>.right-controls>.volume-container");
-        const rect = volumecontainer.getBoundingClientRect();
-        
-        // Calculate the percentage clicked relative to the container
-        percent = (e.clientX - rect.left) / rect.width;
-        percent = Math.min(Math.max(percent, 0), 1); // Ensure percent is between 0 and 1
-        
-        // Update the visual progress bar
-        document.querySelector(".controls>.right-controls>.volume-container>.volume").style.width = `${percent * 100}%`;
-        currentTrack.volume=percent
-    })
+    // Volume: click and drag support (mouse + touch)
+    const volumeContainer = document.querySelector(".controls>.right-controls>.volume-container");
+    const volumeBar = document.querySelector(".controls>.right-controls>.volume-container>.volume");
+    volumeBar.style.width = "100%";
+    var percent = 1;
+    let isAdjustingVolume = false;
+    let volRafPending = false;
+    let volPercent = 1;
+
+    function applyVolumeVisual(){
+        volumeBar.style.width = `${volPercent * 100}%`;
+        currentTrack.volume = volPercent;
+        volRafPending = false;
+    }
+    function updateVolumeFromClientX(clientX){
+        const rect = volumeContainer.getBoundingClientRect();
+        let p = (clientX - rect.left) / rect.width;
+        p = Math.min(Math.max(p, 0), 1);
+        percent = p;
+        volPercent = p;
+        if (!volRafPending) {
+            volRafPending = true;
+            requestAnimationFrame(applyVolumeVisual);
+        }
+    }
+
+    // Click to set volume
+    volumeContainer.addEventListener("click", (e) => {
+        updateVolumeFromClientX(e.clientX);
+    });
+
+    // Drag start/move/end
+    const onVolStart = (clientX) => {
+        isAdjustingVolume = true;
+        volumeContainer.classList.add("dragging");
+        updateVolumeFromClientX(clientX);
+    };
+    const onVolMove = (clientX) => {
+        if (!isAdjustingVolume) return;
+        updateVolumeFromClientX(clientX);
+    };
+    const onVolEnd = () => {
+        if (!isAdjustingVolume) return;
+        isAdjustingVolume = false;
+        volumeContainer.classList.remove("dragging");
+    };
+
+    // Mouse events
+    volumeContainer.addEventListener("mousedown", (e) => {
+        onVolStart(e.clientX);
+        window.addEventListener("mousemove", mouseMoveVol);
+        window.addEventListener("mouseup", mouseUpVol, { once: true });
+    });
+    function mouseMoveVol(e){ onVolMove(e.clientX); }
+    function mouseUpVol(){
+        window.removeEventListener("mousemove", mouseMoveVol);
+        onVolEnd();
+    }
+
+    // Touch events
+    volumeContainer.addEventListener("touchstart", (e) => {
+        if (e.touches && e.touches.length) {
+            onVolStart(e.touches[0].clientX);
+        }
+    }, { passive: true });
+    volumeContainer.addEventListener("touchmove", (e) => {
+        if (e.touches && e.touches.length) {
+            onVolMove(e.touches[0].clientX);
+        }
+    }, { passive: true });
+    volumeContainer.addEventListener("touchend", () => {
+        onVolEnd();
+    });
     
     // Volume button mute/unmute functionality
     document.querySelector(".right-controls>img").addEventListener("click", e => {
@@ -268,60 +640,66 @@ async function main(){
         }
     });
 
-    // Scroll indicators functionality
+    // Scroll indicators functionality for all sections
     function initScrollIndicators() {
-        const cardsContainer = document.querySelector('.cards-container');
-        const plistcards = document.querySelector('.plistcards');
-        const leftIndicator = document.querySelector('.left-indicator');
-        const rightIndicator = document.querySelector('.right-indicator');
+        const cardsContainers = document.querySelectorAll('.cards-container');
         
-        if (!cardsContainer || !plistcards || !leftIndicator || !rightIndicator) return;
-        
-        function updateIndicators() {
-            const scrollLeft = plistcards.scrollLeft;
-            const maxScroll = plistcards.scrollWidth - plistcards.clientWidth;
+        cardsContainers.forEach(cardsContainer => {
+            const plistcards = cardsContainer.querySelector('.plistcards');
+            const leftIndicator = cardsContainer.querySelector('.left-indicator');
+            const rightIndicator = cardsContainer.querySelector('.right-indicator');
             
-            // Show/hide left indicator
-            if (scrollLeft <= 10) {
-                leftIndicator.classList.add('hidden');
-            } else {
-                leftIndicator.classList.remove('hidden');
+            if (!plistcards || !leftIndicator || !rightIndicator) return;
+            
+            // Remove existing event listeners to prevent duplicates
+            const newLeftIndicator = leftIndicator.cloneNode(true);
+            const newRightIndicator = rightIndicator.cloneNode(true);
+            leftIndicator.parentNode.replaceChild(newLeftIndicator, leftIndicator);
+            rightIndicator.parentNode.replaceChild(newRightIndicator, rightIndicator);
+            
+            function updateIndicators() {
+                const scrollLeft = plistcards.scrollLeft;
+                const maxScroll = plistcards.scrollWidth - plistcards.clientWidth;
+                
+                // Show/hide left indicator
+                if (scrollLeft <= 10) {
+                    newLeftIndicator.classList.add('hidden');
+                } else {
+                    newLeftIndicator.classList.remove('hidden');
+                }
+                
+                // Show/hide right indicator
+                if (scrollLeft >= maxScroll - 10) {
+                    newRightIndicator.classList.add('hidden');
+                } else {
+                    newRightIndicator.classList.remove('hidden');
+                }
             }
             
-            // Show/hide right indicator
-            if (scrollLeft >= maxScroll - 10) {
-                rightIndicator.classList.add('hidden');
-            } else {
-                rightIndicator.classList.remove('hidden');
+            function scrollLeftFunc() {
+                const cardWidth = 160; // approximate card width + gap
+                plistcards.scrollBy({
+                    left: -cardWidth * 2,
+                    behavior: 'smooth'
+                });
             }
-        }
-        
-        function scrollLeft() {
-            const cardWidth = 160; // approximate card width + gap
-            plistcards.scrollBy({
-                left: -cardWidth * 2,
-                behavior: 'smooth'
-            });
-        }
-        
-        function scrollRight() {
-            const cardWidth = 160; // approximate card width + gap
-            plistcards.scrollBy({
-                left: cardWidth * 2,
-                behavior: 'smooth'
-            });
-        }
-        
-        // Event listeners
-        leftIndicator.addEventListener('click', scrollLeft);
-        rightIndicator.addEventListener('click', scrollRight);
-        plistcards.addEventListener('scroll', updateIndicators);
-        
-        // Initial update
-        updateIndicators();
-        
-        // Update on window resize
-        window.addEventListener('resize', updateIndicators);
+            
+            function scrollRightFunc() {
+                const cardWidth = 160; // approximate card width + gap
+                plistcards.scrollBy({
+                    left: cardWidth * 2,
+                    behavior: 'smooth'
+                });
+            }
+            
+            // Event listeners
+            newLeftIndicator.addEventListener('click', scrollLeftFunc);
+            newRightIndicator.addEventListener('click', scrollRightFunc);
+            plistcards.addEventListener('scroll', updateIndicators);
+            
+            // Initial update
+            updateIndicators();
+        });
     }
     
     // Initialize scroll indicators
