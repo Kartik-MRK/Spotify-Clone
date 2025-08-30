@@ -1,3 +1,11 @@
+// Configuration for backend API
+const API_CONFIG = {
+    // Replace with your actual Render backend URL once deployed
+    BASE_URL: 'https://your-app-name.onrender.com', // Change this after deployment
+    // For local development, use:
+    // BASE_URL: 'http://localhost:3000',
+};
+
 var currentTrack=new Audio()
 var currentPlayingElement = null; // Track which playlist item is currently playing
 var songs
@@ -7,7 +15,7 @@ function resetAllPlaylistIcons() {
     Array.from(document.querySelectorAll(".playlist ul li")).forEach(item => {
         const playIcon = item.getElementsByTagName("img")[1];
         if (playIcon) {
-            playIcon.src = "assets/svg/play.svg";
+            playIcon.src = "../assets/svg/play.svg";
         }
         // Remove playing class
         item.classList.remove("playing");
@@ -17,7 +25,7 @@ function resetAllPlaylistIcons() {
 function updatePlaylistIcon(element, isPlaying) {
     const playIcon = element.getElementsByTagName("img")[1];
     if (playIcon) {
-        playIcon.src = isPlaying ? "assets/svg/pause.svg" : "assets/svg/play.svg";
+        playIcon.src = isPlaying ? "../assets/svg/pause.svg" : "../assets/svg/play.svg";
     }
     
     // Add or remove highlighting
@@ -28,26 +36,28 @@ function updatePlaylistIcon(element, isPlaying) {
     }
 }
 
-async function getsongs(folder){
-    console.log("Fetching songs from folder:", folder);
-    let a=await fetch(`http://127.0.0.1:3000/Spotify%20Clone/assets/songs/${folder}`)
-    let response=await a.text()
-    console.log("Raw response:", response);
-    let div=document.createElement("div")
-    div.innerHTML=response
-    let as=div.getElementsByTagName('a')
-    let songs=[]
-    for (const a of as) {
-        console.log("Found link:", a.href);
-        if(a.href.endsWith('.mp3'))
-        {
-            songs.push(a.href)
-            console.log("Added song:", a.href);
-        }
-    }
-    console.log("Final songs array:", songs);
-    return songs
+async function getsongs(albumName) {
+    console.log("Fetching songs from album:", albumName);
+    
+    try {
+        const response = await fetch(`${API_CONFIG.BASE_URL}/api/albums/${encodeURIComponent(albumName)}/songs`);
         
+        if (!response.ok) {
+            throw new Error(`HTTP error! status: ${response.status}`);
+        }
+        
+        const songData = await response.json();
+        console.log("Song data received:", songData);
+        
+        // Convert API response to full URLs
+        const songs = songData.map(song => `${API_CONFIG.BASE_URL}${song.url}`);
+        console.log("Final songs array:", songs);
+        
+        return songs;
+    } catch (error) {
+        console.error("Error fetching songs:", error);
+        return [];
+    }
 }
 
 function formatTime(seconds) {
@@ -126,36 +136,31 @@ function playMusic(track,playlistElement){
     const titleEl = leftInfo.querySelector(".song-info .song-name");
     const artistEl = leftInfo.querySelector(".song-info .artist-name");
 
-    // Derive album folder and cover path
-    let songPath = track.split("/songs/")[1];
-    let decodedSongPath = decodeURIComponent(songPath);
-    let pathParts = decodedSongPath.split("/");
-    let fileName = pathParts.pop();
-    let albumFolder = pathParts.join("/");
-    let displayName = fileName.replace(/\.mp3$/i, "");
+    // Derive album folder and cover path from the new API structure
+    let songPath = track.split("/assets/songs/")[1];
+    if (songPath) {
+        let decodedSongPath = decodeURIComponent(songPath);
+        let pathParts = decodedSongPath.split("/");
+        let fileName = pathParts.pop();
+        let albumFolder = pathParts.join("/");
+        let displayName = fileName.replace(/\.mp3$/i, "");
 
-    // Set cover image from album folder cover.jpeg if available
-    if (albumFolder) {
-        // Use same base origin as track
-        try {
-            const trackUrl = new URL(track);
-            const base = `${trackUrl.origin}${trackUrl.pathname.split("/assets/")[0]}`; // typically ""
-            // Build cover URL directly relative to known structure
-            const coverUrl = `${trackUrl.origin}/Spotify%20Clone/assets/songs/${encodeURI(albumFolder)}/cover.jpeg`;
+        // Set cover image from album folder using API backend
+        if (albumFolder) {
+            const coverUrl = `${API_CONFIG.BASE_URL}/assets/songs/${encodeURIComponent(albumFolder)}/cover.jpeg`;
+            
             // Fallback to default if not found
             coverImg.onerror = function(){
                 coverImg.onerror = null;
-                coverImg.src = "assets/img/cover.jpeg";
+                coverImg.src = "../assets/img/cover.jpeg";
             };
             coverImg.src = coverUrl;
-        } catch (e) {
-            console.warn("Failed to compute cover URL, keeping default", e);
         }
-    }
 
-    // Default UI updates
-    titleEl.textContent = displayName;
-    artistEl.textContent = "Unknown Artist";
+        // Default UI updates
+        titleEl.textContent = displayName;
+        artistEl.textContent = "Unknown Artist";
+    }
 
     // Try to read ID3 tags (artist, title) from the remote file
     if (window.jsmediatags) {
@@ -205,12 +210,15 @@ function handleSongEnd() {
         let targetElement = null;
         
         // Extract the song name from the URL for comparison
-        let songPath = songs[nextIndex].split("/songs/")[1];
+        let songPath = songs[nextIndex].split("/assets/songs/")[1];
         let targetSongName;
-        if (songPath.includes("/")) {
+        if (songPath && songPath.includes("/")) {
             targetSongName = songPath.split("/").pop().replaceAll("%20", " ").replaceAll(".mp3", "");
-        } else {
+        } else if (songPath) {
             targetSongName = songPath.replaceAll("%20", " ").replaceAll(".mp3", "");
+        } else {
+            // Fallback: extract from full URL
+            targetSongName = songs[nextIndex].split("/").pop().replaceAll("%20", " ").replaceAll(".mp3", "");
         }
         
         // Find matching playlist element
@@ -227,7 +235,7 @@ function handleSongEnd() {
         // Update play button to pause state
         let play = document.getElementById("play");
         if (play) {
-            play.src = "assets/svg/pause.svg";
+            play.src = "../assets/svg/pause.svg";
         }
     }
 }
@@ -236,40 +244,59 @@ function handleSongEnd() {
 async function main(){
     //making dynamic albums
     async function dynamicalbums(){
-        let lang_plist={
-            'mixed':'mixed',
-            'hindi':'hindi-songs',
-            'kannada':'kannada-hits'
-        }
-        let alb=await fetch('http://127.0.0.1:3000/Spotify%20Clone/assets/songs')
-        let response=await alb.text()
-        let div=document.createElement("div")
-        div.innerHTML=response
-        let albums=Array.from(div.getElementsByTagName('a')).slice(1)
-        // console.log(albums);
-        for (const element of albums) {
-            let seperator=element.innerText.lastIndexOf("-")
-            let language=element.innerText.slice(seperator+1).split("/")[0]
-            let list_cont=document.querySelector(`#${lang_plist[language]}`)
-            let name=element.innerText.slice(0,seperator).split("/")[0]
-            let card=document.createElement("div")
-            card.classList.add("plistcard")
-            card.innerHTML=`<img src="assets/songs/${element.innerText}cover.jpeg" alt="">
-                                <p>${name}</p>
-                                <span class="play-btn"><img src="assets/svg/play.svg" alt=""></span>`
-
-            list_cont.appendChild(card)
-            card.addEventListener("click",async ()=>{
-                songs=await getsongs(element.innerText.split("/")[0])
-                library_function()
-                
-            })
-                
-        }
-        //displaying cards
+        const lang_plist = {
+            'mixed': 'mixed',
+            'hindi': 'hindi-songs', 
+            'kannada': 'kannada-hits'
+        };
         
-        // Re-initialize scroll indicators after content is loaded
-        initScrollIndicators();
+        try {
+            // Fetch albums from the new API
+            const response = await fetch(`${API_CONFIG.BASE_URL}/api/albums`);
+            
+            if (!response.ok) {
+                throw new Error(`HTTP error! status: ${response.status}`);
+            }
+            
+            const albums = await response.json();
+            console.log("Albums received:", albums);
+            
+            for (const albumName of albums) {
+                // Extract language from album name (assuming format: "Album Name-language")
+                const separator = albumName.lastIndexOf("-");
+                const language = separator !== -1 ? albumName.slice(separator + 1) : 'mixed';
+                const displayName = separator !== -1 ? albumName.slice(0, separator) : albumName;
+                
+                const listContainer = document.querySelector(`#${lang_plist[language] || 'mixed'}`);
+                
+                if (listContainer) {
+                    const card = document.createElement("div");
+                    card.classList.add("plistcard");
+                    card.innerHTML = `
+                        <img src="${API_CONFIG.BASE_URL}/assets/songs/${encodeURIComponent(albumName)}/cover.jpeg" 
+                             alt="${displayName}" 
+                             onerror="this.src='../assets/img/cover.jpeg'">
+                        <p>${displayName}</p>
+                        <span class="play-btn"><img src="../assets/svg/play.svg" alt=""></span>
+                    `;
+
+                    listContainer.appendChild(card);
+                    
+                    card.addEventListener("click", async () => {
+                        console.log("Loading album:", albumName);
+                        songs = await getsongs(albumName);
+                        library_function();
+                    });
+                }
+            }
+            
+            // Re-initialize scroll indicators after content is loaded
+            initScrollIndicators();
+            
+        } catch (error) {
+            console.error("Error fetching albums:", error);
+            // You might want to show an error message to the user here
+        }
     }
     await dynamicalbums()
 
@@ -280,20 +307,23 @@ async function main(){
         
         // Add new songs to the playlist
         for (const song of songs) {
-            // More robust song name extraction
-            let songPath = song.split("/songs/")[1]; // Get everything after /songs/
+            // More robust song name extraction for API URLs
+            let songPath = song.split("/assets/songs/")[1]; // Get everything after /assets/songs/
             let songName;
             
             // Check if the path contains a folder structure (has /)
-            if (songPath.includes("/")) {
+            if (songPath && songPath.includes("/")) {
                 // Extract just the filename from the nested structure
                 songName = songPath.split("/").pop().replaceAll("%20", " ").replaceAll(".mp3", "");
-            } else {
+            } else if (songPath) {
                 // Direct file in songs folder
                 songName = songPath.replaceAll("%20", " ").replaceAll(".mp3", "");
+            } else {
+                // Fallback: extract from full URL
+                songName = song.split("/").pop().replaceAll("%20", " ").replaceAll(".mp3", "");
             }
 
-            songUL.innerHTML += `<li><img src="assets/svg/music.svg" alt=""><span>${songName}</span><img src="assets/svg/play.svg" alt=""></li>`;
+            songUL.innerHTML += `<li><img src="../assets/svg/music.svg" alt=""><span>${songName}</span><img src="../assets/svg/play.svg" alt=""></li>`;
         }
         
         // Remove existing event listeners and add new ones
@@ -343,7 +373,7 @@ async function main(){
                 if (songPath) {
                     playMusic(songPath, newElement);
                     let play = document.getElementById("play");
-                    play.src = "assets/svg/pause.svg";
+                    play.src = "../assets/svg/pause.svg";
                 } else {
                     console.error("Song not found for:", songName);
                 }
@@ -367,7 +397,7 @@ async function main(){
     playbtn.addEventListener("click",(e)=>{
         if(currentTrack.paused){
             currentTrack.play()
-            play.src="assets/svg/pause.svg"
+            play.src="../assets/svg/pause.svg"
             // Update playlist icon to pause
             if (currentPlayingElement) {
                 updatePlaylistIcon(currentPlayingElement, true);
@@ -375,7 +405,7 @@ async function main(){
         }
         else{
             currentTrack.pause()
-            play.src="assets/svg/play.svg"
+            play.src="../assets/svg/play.svg"
             // Update playlist icon to play
             if (currentPlayingElement) {
                 updatePlaylistIcon(currentPlayingElement, false);
@@ -483,7 +513,7 @@ async function main(){
         });
         
         playMusic(songs[prevIndex], targetElement);
-        play.src="assets/svg/pause.svg";
+        play.src="../assets/svg/pause.svg";
     });
 
     next.addEventListener("click", e => {
@@ -512,7 +542,7 @@ async function main(){
         });
         
         playMusic(songs[nextIndex], targetElement);
-        play.src="assets/svg/pause.svg";
+        play.src="../assets/svg/pause.svg";
     });
 
     // Volume: click and drag support (mouse + touch)
@@ -592,11 +622,11 @@ async function main(){
     // Volume button mute/unmute functionality
     document.querySelector(".right-controls>img").addEventListener("click", e => {
         if (e.target.src.includes("volume.svg")) {
-            e.target.src = "assets/svg/mute.svg";
+            e.target.src = "../assets/svg/mute.svg";
             currentTrack.volume = 0; // mute
             document.querySelector(".controls>.right-controls>.volume-container>.volume").style.width = "0%";
         } else {
-            e.target.src = "assets/svg/volume.svg";
+            e.target.src = "../assets/svg/volume.svg";
             currentTrack.volume = percent; // restore previous volume
             document.querySelector(".controls>.right-controls>.volume-container>.volume").style.width = `${percent * 100}%`;
         }
