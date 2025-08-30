@@ -11,8 +11,13 @@ app.use(cors({
   origin: [
     "https://kartik-mrk.github.io", // Replace with your GitHub username
     "http://localhost:3000",
+    "http://localhost:5500", // For Live Server during development
+    "http://127.0.0.1:5500", // Alternative Live Server port
+    "http://localhost:8080", // Another common dev server port
     "http://127.0.0.1:3000",
-    "http://localhost:5500" // For Live Server during development
+    // Allow any localhost port for development
+    /^http:\/\/localhost:\d+$/,
+    /^http:\/\/127\.0\.0\.1:\d+$/
   ],
   credentials: true
 }));

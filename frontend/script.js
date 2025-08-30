@@ -1,9 +1,9 @@
 // Configuration for backend API
 const API_CONFIG = {
     // Replace with your actual Render backend URL once deployed
-    BASE_URL: 'https://your-app-name.onrender.com', // Change this after deployment
-    // For local development, use:
-    // BASE_URL: 'http://localhost:3000',
+    // BASE_URL: 'https://your-app-name.onrender.com', // Change this after deployment
+    // For local development, uncomment the line below and comment the line above:
+    BASE_URL: 'https://spotify-backend-cfrp.onrender.com',
 };
 
 var currentTrack=new Audio()
