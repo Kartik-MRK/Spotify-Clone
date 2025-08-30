@@ -9,7 +9,8 @@ const PORT = process.env.PORT || 3000;
 // Enable CORS for GitHub Pages (replace with your actual GitHub Pages URL)
 app.use(cors({
   origin: [
-    "https://kartik-mrk.github.io", // Replace with your GitHub username
+    "https://kartik-mrk.github.io", // Your GitHub Pages domain
+    "https://kartik-mrk.github.io/Spotify-Clone", // Your specific GitHub Pages project URL
     "http://localhost:3000",
     "https://spotify-backend-cfrp.onrender.com", // For Live Server during development
     "http://127.0.0.1:5500", // Alternative Live Server port
